@@ -98,7 +98,10 @@ def init_db():
 @app.route("/")
 def home():
     token = secrets.token_urlsafe(16)
-    ip = request.remote_addr
+
+    # Get real IP from Cloudflare header (if available), otherwise from X-Forwarded-For
+    ip = request.headers.get("CF-Connecting-IP") or request.remote_addr
+
     result = vpn_lists.lookup(ip)  # local lookup, takes microseconds
 
     with engine.connect() as conn:
