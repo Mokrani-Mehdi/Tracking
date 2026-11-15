@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ip-tracker
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ip-tracker-db
+          property: connectionString
+      - key: PROXY_COUNT
+        value: "1"
+
+databases:
+  - name: ip-tracker-db
+    plan: free
+    databaseName: tracking
+    user: postgres
+    postgresDatabaseVersion: "15"
