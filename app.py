@@ -403,7 +403,356 @@ def dashboard():
     return html
 
 
-init_db()
+@app.route("/admin")
+def admin():
+    """Admin dashboard to manage all tracked visits"""
+    html = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IP Tracker Admin</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 { color: white; margin-bottom: 2rem; text-align: center; }
+    .controls {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    input, select {
+      padding: 0.75rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    input { flex: 1; min-width: 200px; }
+    button {
+      padding: 0.75rem 1.5rem;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover { background: #764ba2; }
+    .btn-danger {
+      background: #dc3545;
+      margin-left: auto;
+    }
+    .btn-danger:hover { background: #c82333; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-box {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stat-number { font-size: 2rem; font-weight: bold; color: #667eea; }
+    .stat-label { color: #666; margin-top: 0.5rem; font-size: 0.9rem; }
+    table {
+      width: 100%;
+      background: white;
+      border-collapse: collapse;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    th {
+      background: #f8f9fa;
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #ddd;
+    }
+    td {
+      padding: 1rem;
+      border-bottom: 1px solid #eee;
+    }
+    tr:hover { background: #f9f9f9; }
+    .vpn-yes { color: #dc3545; font-weight: bold; }
+    .vpn-no { color: #28a745; font-weight: bold; }
+    .ip { font-family: monospace; background: #f5f5f5; padding: 0.25rem 0.5rem; border-radius: 3px; }
+    .time { color: #666; font-size: 0.85rem; }
+    .no-data {
+      text-align: center;
+      padding: 2rem;
+      color: #999;
+    }
+    .loading { text-align: center; color: #667eea; }
+    .delete-btn {
+      background: #dc3545;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+    }
+    .delete-btn:hover { background: #c82333; }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .modal-content h2 { margin-bottom: 1rem; color: #333; }
+    .modal-content p { margin-bottom: 1.5rem; color: #666; }
+    .modal-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+    .modal-buttons button {
+      padding: 0.75rem 2rem;
+    }
+    .btn-cancel {
+      background: #6c757d;
+    }
+    .btn-cancel:hover { background: #5a6268; }
+    .info-bar {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚙️ IP Tracker Admin Panel</h1>
+
+    <div class="info-bar">
+      📊 Total tracked visits: <strong id="infoCount">0</strong> |
+      🔍 Showing: <strong id="infoCurrent">0</strong>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="search" placeholder="Search by IP, timezone, or user agent...">
+      <select id="vpnFilter">
+        <option value="">All Records</option>
+        <option value="vpn">VPN/Datacenter Only</option>
+        <option value="clean">Clean IPs Only</option>
+      </select>
+      <button onclick="refreshData()">🔄 Refresh</button>
+      <button class="btn-danger" onclick="showDeleteAllModal()">🗑️ Clear All</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-number" id="totalCount">0</div>
+        <div class="stat-label">Total Visits</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" id="vpnCount">0</div>
+        <div class="stat-label">VPN/Datacenter</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" id="cleanCount">0</div>
+        <div class="stat-label">Clean IPs</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" id="unknownCount">0</div>
+        <div class="stat-label">Unknown</div>
+      </div>
+    </div>
+
+    <div id="tableContainer">
+      <table>
+        <thead>
+          <tr>
+            <th>IP Address</th>
+            <th>Timezone</th>
+            <th>VPN/DC</th>
+            <th>Timestamp</th>
+            <th>User Agent</th>
+            <th style="width: 80px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="6" class="loading">Loading data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="deleteAllModal" class="modal">
+    <div class="modal-content">
+      <h2>⚠️ Clear All Records?</h2>
+      <p>This will permanently delete all <strong id="modalCount">0</strong> tracked visits.</p>
+      <p style="color: #dc3545; font-weight: bold;">This action cannot be undone!</p>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="hideDeleteAllModal()">Cancel</button>
+        <button class="btn-danger" onclick="confirmDeleteAll()">Yes, Delete All</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allData = [];
+
+    async function loadData() {
+      try {
+        const res = await fetch('/api/visits');
+        allData = await res.json();
+        filterData();
+        updateStats();
+      } catch (e) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="no-data">Error loading data</td></tr>';
+      }
+    }
+
+    function filterData() {
+      const searchTerm = document.getElementById('search').value.toLowerCase();
+      const vpnFilter = document.getElementById('vpnFilter').value;
+
+      let filtered = allData.filter(row => {
+        const matchesSearch = !searchTerm ||
+          (row.ip && row.ip.includes(searchTerm)) ||
+          (row.timezone && row.timezone.toLowerCase().includes(searchTerm)) ||
+          (row.user_agent && row.user_agent.toLowerCase().includes(searchTerm));
+
+        const matchesVPN = !vpnFilter ||
+          (vpnFilter === 'vpn' && row.vpn_flag === 1) ||
+          (vpnFilter === 'clean' && row.vpn_flag === 0);
+
+        return matchesSearch && matchesVPN;
+      });
+
+      renderTable(filtered);
+      document.getElementById('infoCurrent').textContent = filtered.length;
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('tableBody');
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No records found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(row => {
+        const date = new Date(row.timestamp_utc);
+        const time = date.toLocaleString();
+        const vpnStatus = row.vpn_flag === 1 ? `<span class="vpn-yes">✓ ${row.vpn_reason}</span>` :
+                          row.vpn_flag === 0 ? '<span class="vpn-no">✓ Clean</span>' : 'Unknown';
+        const ua = row.user_agent ? row.user_agent.substring(0, 40) + '...' : 'N/A';
+
+        return `
+          <tr>
+            <td><span class="ip">${row.ip}</span></td>
+            <td>${row.timezone || '—'}</td>
+            <td>${vpnStatus}</td>
+            <td><span class="time">${time}</span></td>
+            <td><span title="${row.user_agent}">${ua}</span></td>
+            <td><button class="delete-btn" onclick="deleteVisit(${row.id})">Delete</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateStats() {
+      document.getElementById('totalCount').textContent = allData.length;
+      document.getElementById('infoCount').textContent = allData.length;
+      document.getElementById('vpnCount').textContent = allData.filter(r => r.vpn_flag === 1).length;
+      document.getElementById('cleanCount').textContent = allData.filter(r => r.vpn_flag === 0).length;
+      document.getElementById('unknownCount').textContent = allData.filter(r => r.vpn_flag === null).length;
+    }
+
+    function refreshData() {
+      loadData();
+    }
+
+    async function deleteVisit(id) {
+      if (!confirm('Delete this record?')) return;
+      try {
+        await fetch('/api/visits/' + id, { method: 'DELETE' });
+        loadData();
+      } catch (e) {
+        alert('Error deleting record');
+      }
+    }
+
+    function showDeleteAllModal() {
+      document.getElementById('modalCount').textContent = allData.length;
+      document.getElementById('deleteAllModal').classList.add('active');
+    }
+
+    function hideDeleteAllModal() {
+      document.getElementById('deleteAllModal').classList.remove('active');
+    }
+
+    async function confirmDeleteAll() {
+      try {
+        await fetch('/api/visits/clear-all', { method: 'DELETE' });
+        hideDeleteAllModal();
+        loadData();
+      } catch (e) {
+        alert('Error clearing all records');
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', filterData);
+    document.getElementById('vpnFilter').addEventListener('change', filterData);
+
+    loadData();
+  </script>
+</body>
+</html>"""
+    return html
+
+
+@app.route("/api/visits/<int:visit_id>", methods=["DELETE"])
+def delete_visit(visit_id):
+    """Delete a single visit record"""
+    with engine.connect() as conn:
+        conn.execute(text("DELETE FROM visits WHERE id = :id"), {"id": visit_id})
+        conn.commit()
+    return jsonify(ok=True)
+
+
+@app.route("/api/visits/clear-all", methods=["DELETE"])
+def delete_all_visits():
+    """Delete all visit records"""
+    with engine.connect() as conn:
+        conn.execute(text("DELETE FROM visits"))
+        conn.commit()
+    return jsonify(ok=True)
 vpn_lists.refresh()  # Load IP lists once at startup (no background refresh)
 
 if __name__ == "__main__":
