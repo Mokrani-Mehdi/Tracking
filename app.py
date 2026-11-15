@@ -30,7 +30,7 @@ else:
 
 # Only enable this if your app is behind a reverse proxy / CDN.
 # Set PROXY_COUNT to the number of proxies in front of Flask (e.g. 1).
-proxy_count = int(os.environ.get("PROXY_COUNT", "0"))
+proxy_count = int(os.environ.get("PROXY_COUNT", "1"))  # Default to 1 for Render
 if proxy_count > 0:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_count)
 
