@@ -164,6 +164,20 @@ def get_visits():
     return jsonify(visits)
 
 
+@app.route("/debug/headers")
+def debug_headers():
+    """Debug endpoint to see what headers Render is sending"""
+    return jsonify(
+        remote_addr=request.remote_addr,
+        x_forwarded_for=request.headers.get("X-Forwarded-For"),
+        x_forwarded_proto=request.headers.get("X-Forwarded-Proto"),
+        x_forwarded_host=request.headers.get("X-Forwarded-Host"),
+        x_real_ip=request.headers.get("X-Real-IP"),
+        cf_connecting_ip=request.headers.get("CF-Connecting-IP"),
+        all_headers={k: v for k, v in request.headers}
+    )
+
+
 init_db()
 vpn_lists.refresh()  # Load IP lists once at startup (no background refresh)
 
