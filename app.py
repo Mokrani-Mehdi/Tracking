@@ -42,13 +42,12 @@ PAGE = """<!doctype html>
   <title>My Site</title>
   <style>
     body { display: grid; place-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
-    button { font-size: 1.2rem; padding: .8rem 1.6rem; cursor: pointer; }
   </style>
 </head>
 <body>
-  <button id="btn">Click me</button>
+  <p>Redirecting...</p>
   <script>
-    document.getElementById("btn").addEventListener("click", () => alert("Hello!"));
+    const token = "{{ token }}";
 
     // Send the browser's timezone to the server
     try {
@@ -56,9 +55,19 @@ PAGE = """<!doctype html>
       fetch("/log-tz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: "{{ token }}", tz: tz })
+        body: JSON.stringify({ token: token, tz: tz })
       });
     } catch (e) { /* timezone stays NULL */ }
+
+    // Redirect immediately
+    fetch("/redirect/{{ redirect_to }}")
+      .then(r => r.json())
+      .then(data => {
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+        }
+      })
+      .catch(e => console.error(e));
   </script>
 </body>
 </html>"""
@@ -106,7 +115,27 @@ def home():
         })
         conn.commit()
 
-    return render_template_string(PAGE, token=token)
+    return render_template_string(PAGE, token=token, redirect_to="tiktok")
+
+
+@app.route("/redirect/<path:destination>")
+def redirect_page(destination):
+    """Redirect to a specified URL after tracking"""
+    # Whitelist safe URLs to prevent open redirect attacks
+    allowed_urls = {
+        "tiktok": "https://www.tiktok.com",
+        "instagram": "https://www.instagram.com",
+        "youtube": "https://www.youtube.com",
+        "twitter": "https://www.twitter.com",
+        "facebook": "https://www.facebook.com",
+        "github": "https://www.github.com",
+    }
+
+    url = allowed_urls.get(destination.lower())
+    if not url:
+        return jsonify(error="Invalid redirect destination"), 400
+
+    return jsonify(redirect_url=url)
 
 
 @app.route("/log-tz", methods=["POST"])
